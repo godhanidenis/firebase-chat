@@ -1,0 +1,62 @@
+.MuiOutlinedInput-input {
+  padding: 10px 8px;
+}
+
+.MuiMenuItem-root {
+  font-size: 15px !important;
+}
+
+.MuiAutocomplete-input {
+  padding: 0 !important;
+}
+
+.MuiAutocomplete-option {
+  font-size: 15px !important;
+}
+
+.react-datepicker {
+  font-size: 12px !important;
+  border: 1px solid gray !important;
+}
+
+.react-datepicker__input-container input {
+  border: 1px solid rgba(0, 0, 0, 0.23);
+  border-radius: 4px;
+  padding: 8px 10px 8px;
+}
+
+.react-datepicker__input-container input:hover {
+  border: 1px solid #ffae1b;
+}
+
+.react-datepicker__input-container input:focus-visible {
+  outline: 2px solid #ffae1b;
+  border: none;
+}
+
+.react-datepicker__day--selected {
+  background-color: #ffae1b;
+}
+
+.react-datepicker__header {
+  background-color: #ffae1b;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: none;
+  border-radius: 0;
+}
+
+.react-datepicker__current-month {
+  font-size: 12px;
+}
+
+.react-datepicker__day-names {
+  display: flex;
+  justify-content: space-evenly;
+}
+
+.react-datepicker__week {
+  display: flex;
+  justify-content: space-evenly;
+}

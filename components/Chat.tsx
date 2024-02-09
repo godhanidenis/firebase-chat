@@ -2,19 +2,26 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Chat } from "@/types/chat";
+import { Chat, User } from "@/types/chat";
+import PersonAddAltIcon from "@mui/icons-material/PersonAddAlt";
+import AddEditUserModal from "./AddEditUserModal";
+import SearchIcon from "@mui/icons-material/Search";
+import { collection, getDocs, query } from "firebase/firestore/lite";
+import { db } from "@/firebase";
+import { Avatar } from "@mui/material";
+import { stringAvatar } from "@/utils";
 
 // SearchBar Component
 const SearchBar = () => {
   return (
     <div className="flex justify-between items-center relative my-6">
-      <span className="text-gray-400 absolute left-4">
-        {/* <SearchIcon fontSize="small" /> */}
+      <span className="text-gray-400 absolute left-2">
+        <SearchIcon />
       </span>
       <input
         type="text"
         className="w-full px-10 h-10 bg-[#F7F7F8] outline-none text-xs text-gray-400 rounded-[5px]"
-        placeholder="Suchen"
+        placeholder="Search or start new chat"
       />
     </div>
   );
@@ -52,15 +59,16 @@ const MessageItem = ({ message }: MessageItemProps) => {
   return (
     <div className="flex items-center justify-between py-3 px-4 bg-white border-b">
       <div className="flex items-center">
+        <Avatar {...stringAvatar("Kent Dodds")} />
         {/* Additional elements like role avatar can be added here */}
         {/* <p className="text-sm font-medium mr-2">{message.role}</p> */}
-        <p className="text-xs text-gray-500">{message?.content}</p>
+        {/* <p className="text-xs text-gray-500">{message?.content}</p> */}
       </div>
-      <div>
+      {/* <div>
         <span className="text-xs text-gray-400">
           {message?.created_at?.toDateString()}
         </span>
-      </div>
+      </div> */}
     </div>
   );
 };
@@ -157,13 +165,25 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
 interface LeftPanelProps {
   messages: Chat[];
   onChatSelect: (chatId: string) => void;
+  handleOpenModal: () => void;
 }
 
 // LeftPanel Component
-const LeftPanel: React.FC<LeftPanelProps> = ({ messages, onChatSelect }) => {
+const LeftPanel: React.FC<LeftPanelProps> = ({
+  messages,
+  onChatSelect,
+  handleOpenModal,
+}) => {
   return (
     <div className="w-1/3 h-[calc(100vh-65px)] bg-white rounded-xl p-5">
-      <h2 className="text-base font-semibold">Mitteilungen</h2>
+      <div className="flex justify-between">
+        <span className="font-semibold text-[20px]">Firebase Chat</span>
+        <PersonAddAltIcon
+          sx={{ color: "black" }}
+          onClick={handleOpenModal}
+          className="hover:cursor-pointer"
+        />
+      </div>
       <SearchBar />
       <MessageList messages={messages} onChatSelect={onChatSelect} />
     </div>
@@ -188,7 +208,7 @@ const RightPanel = ({
   onSendMessage,
 }: RightPanelProps) => {
   return (
-    <div className="w-2/3 h-[calc(100vh-65px)] bg-white rounded-xl p-10">
+    <div className="w-2/3 h-[calc(100vh-65px)] bg-white rounded-xl p-5">
       <ChatHeader
         chatTitle={chatDetails.title}
         chatSubtitle={chatDetails.subtitle}
@@ -207,6 +227,7 @@ interface GroupedMessages {
 // MessagesPage.tsx
 const Chat = () => {
   // State variables
+  const [userModal, setuserModal] = useState<boolean>(false);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Chat[]>([
     {
@@ -229,6 +250,10 @@ const Chat = () => {
     title: "Chat Title", // Example chat title
     subtitle: "Chat Subtitle", // Example chat subtitle
   });
+
+  const handleOpenUserModal = () => setuserModal(true);
+
+  const handleCloseUserModal = () => setuserModal(false);
 
   // Handler for selecting a chat
   const handleChatSelect = (chatId: string) => {
@@ -259,13 +284,41 @@ const Chat = () => {
   // Handler for sending a message
   const handleSendMessage = async (messageContent: string) => {};
 
+  const [users, setUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    async function fetchUsers() {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef);
+      const querySnapshot = await getDocs(q);
+      const usersList: User[] = querySnapshot.docs.map((doc) => ({
+        ...doc.data(),
+        id: doc.id,
+      }));
+      setUsers(usersList);
+    }
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    console.log("users:", users);
+  }, [users]);
+
   return (
     <div className="p-8 w-full flex gap-6">
-      <LeftPanel messages={lastMessages} onChatSelect={handleChatSelect} />
+      <LeftPanel
+        messages={lastMessages}
+        onChatSelect={handleChatSelect}
+        handleOpenModal={handleOpenUserModal}
+      />
       <RightPanel
         chatDetails={chatDetails}
         messages={filteredMessages}
         onSendMessage={handleSendMessage}
+      />
+      <AddEditUserModal
+        open={userModal}
+        handleCloseModal={handleCloseUserModal}
       />
     </div>
   );

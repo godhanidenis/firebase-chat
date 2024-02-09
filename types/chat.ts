@@ -19,4 +19,13 @@ interface ManyChats {
   skip: number;
 }
 
-export type { Chat, ManyChats, ChatUpdate, ChatCreation };
+// Assuming you have a type/interface for user data
+interface User {
+  // Define the structure of a user
+  // For example:
+  id: string;
+  name?: string;
+  // Add more properties if needed
+}
+
+export type { Chat, ManyChats, ChatUpdate, ChatCreation, User };
