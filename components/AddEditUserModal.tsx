@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
-import { FormInputField } from "./core/CustomFormFields";
+import { FormInputField, FormSelectField } from "./core/CustomFormFields";
 import { Alert, Box, Button, Modal, Snackbar } from "@mui/material";
 import LoadingButton from "@mui/lab/LoadingButton";
 import SaveIcon from "@mui/icons-material/Save";
@@ -20,13 +20,7 @@ const style = {
   boxShadow: 24,
 };
 
-const AddEditUserModal = ({
-  open,
-  handleCloseModal,
-}: {
-  open: boolean;
-  handleCloseModal: () => void;
-}) => {
+const AddEditUserModal = ({ open, handleCloseModal }: { open: boolean; handleCloseModal: () => void }) => {
   const [loader, setLoader] = useState(false);
 
   const [openMessage, setOpenMessage] = useState(false);
@@ -46,6 +40,7 @@ const AddEditUserModal = ({
     defaultValues: {
       name: "",
       phone: "",
+      type: "",
     },
   });
 
@@ -67,21 +62,14 @@ const AddEditUserModal = ({
 
   return (
     <>
-      <Modal
-        open={open}
-        onClose={handleCloseModal}
-        aria-labelledby="modal-modal-title"
-        aria-describedby="modal-modal-description"
-      >
+      <Modal open={open} onClose={handleCloseModal} aria-labelledby="modal-modal-title" aria-describedby="modal-modal-description">
         <Box sx={style}>
           <div className="px-3 py-3 bg-black">
             <h1 className="text-white text-[20px]">User</h1>
           </div>
           <div className="flex px-3 py-3 flex-col gap-3">
             <div className="flex flex-col gap-1">
-              <span className="text-[16px] font-semibold text-[#000000]">
-                Name
-              </span>
+              <span className="text-[16px] font-semibold text-[#000000]">Name</span>
               <FormInputField
                 type="text"
                 name="name"
@@ -92,17 +80,11 @@ const AddEditUserModal = ({
                 }}
               />
 
-              {errors?.name && (
-                <p className="text-[#FF0000] font-semibold text-[12px]">
-                  {(errors as any)?.name?.message}
-                </p>
-              )}
+              {errors?.name && <p className="text-[#FF0000] font-semibold text-[12px]">{(errors as any)?.name?.message}</p>}
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="text-[16px] font-semibold text-[#000000]">
-                Phone
-              </span>
+              <span className="text-[16px] font-semibold text-[#000000]">Phone</span>
               <FormInputField
                 type="text"
                 name="phone"
@@ -113,11 +95,26 @@ const AddEditUserModal = ({
                 }}
               />
 
-              {errors?.phone && (
-                <p className="text-[#FF0000] font-semibold text-[12px]">
-                  {(errors as any)?.phone?.message}
-                </p>
-              )}
+              {errors?.phone && <p className="text-[#FF0000] font-semibold text-[12px]">{(errors as any)?.phone?.message}</p>}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[16px] font-semibold text-[#000000]">Type</span>
+
+              <FormSelectField
+                name="type"
+                control={control}
+                options={[
+                  { value: "business", label: "Business" },
+                  { value: "user", label: "User" },
+                ]}
+                placeholder="Select Type"
+                rules={{
+                  required: "Type is required",
+                }}
+              />
+
+              {errors?.type && <p className="text-[#FF0000] font-semibold text-[12px]">{(errors as any)?.type?.message}</p>}
             </div>
 
             <div className="flex justify-end">
@@ -135,18 +132,8 @@ const AddEditUserModal = ({
           </div>
         </Box>
       </Modal>
-      <Snackbar
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-        open={openMessage}
-        autoHideDuration={2000}
-        onClose={handleCloseMessage}
-      >
-        <Alert
-          onClose={handleCloseMessage}
-          severity="success"
-          variant="filled"
-          sx={{ width: "100%" }}
-        >
+      <Snackbar anchorOrigin={{ vertical: "top", horizontal: "right" }} open={openMessage} autoHideDuration={2000} onClose={handleCloseMessage}>
+        <Alert onClose={handleCloseMessage} severity="success" variant="filled" sx={{ width: "100%" }}>
           User Created Successfully!!
         </Alert>
       </Snackbar>

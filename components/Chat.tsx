@@ -6,10 +6,15 @@ import { Chat, User } from "@/types/chat";
 import PersonAddAltIcon from "@mui/icons-material/PersonAddAlt";
 import AddEditUserModal from "./AddEditUserModal";
 import SearchIcon from "@mui/icons-material/Search";
-import { collection, getDocs, query } from "firebase/firestore/lite";
+import { DocumentData, QuerySnapshot, collection, getDocs, query } from "firebase/firestore/lite";
 import { db } from "@/firebase";
 import { Avatar } from "@mui/material";
 import { stringAvatar } from "@/utils";
+import { FormSelectField } from "./core/CustomFormFields";
+import { useForm } from "react-hook-form";
+import { v4 as uuidv4 } from "uuid";
+import { doc, setDoc, updateDoc, getDoc } from "firebase/firestore/lite";
+import { onSnapshot } from "firebase/firestore";
 
 // SearchBar Component
 const SearchBar = () => {
@@ -39,13 +44,38 @@ const MessageList = ({ messages, onChatSelect }: MessageListProps) => {
   return (
     <div className="overflow-y-auto h-[calc(100vh-240px)] scrollbar-none">
       {messages.map((message) => (
-        <div
-          key={message.id}
-          onClick={() => onChatSelect(message?.chatId ?? "")}
-        >
+        <div key={message.id} onClick={() => onChatSelect(message?.chatId ?? "")}>
           <MessageItem message={message} />
         </div>
       ))}
+    </div>
+  );
+};
+interface ChatsListProps {
+  chats: Chat[];
+  users: any;
+  selectedClientId: any;
+  onChatSelect: (chatId: string) => void;
+}
+
+const ChatsList = ({ chats, users, selectedClientId, onChatSelect }: ChatsListProps) => {
+  return (
+    <div className="overflow-y-auto h-[calc(100vh-240px)] scrollbar-none">
+      {chats.map((chats: any) => {
+        // const FindName = users?.find((item: any) => item?.id === chats.businessId)?.name;
+        if (selectedClientId === chats?.clintUserInfo?.id) {
+          return (
+            <div key={chats.id} onClick={() => onChatSelect(chats)} className="cursor-pointer">
+              <div className="flex items-center justify-between py-3 px-4 bg-white border-b">
+                <div className="flex items-center gap-3">
+                  <Avatar {...stringAvatar(`${chats.businessUserInfo.name} D`)} />
+                  <p className="text-xs text-gray-500">{chats.businessUserInfo.name}</p>
+                </div>
+              </div>
+            </div>
+          );
+        }
+      })}
     </div>
   );
 };
@@ -84,8 +114,10 @@ const ChatHeader = ({ chatTitle, chatSubtitle }: ChatHeaderProps) => {
     <div className="flex justify-between">
       <div className="flex gap-2">
         <div>
-          <p className="text-base">{chatTitle}</p>
-          <p className="text-xs text-[#808080]">{chatSubtitle}</p>
+          {/* <p className="text-base">{chatTitle}</p>
+          <p className="text-base">{chatSubtitle}</p> */}
+          <p className="text-lg font-semibold text-[#000]">{chatTitle}</p>
+          {/* <p className="text-xs text-[#808080]">{chatSubtitle}</p> */}
         </div>
       </div>
     </div>
@@ -100,16 +132,19 @@ interface ChatBodyProps {
 const ChatBody = ({ messages }: ChatBodyProps) => {
   return (
     <div className="overflow-y-auto h-[calc(100vh-240px)] scrollbar-none my-3">
-      {messages.map((message, index) => (
-        <div key={index} className={`flex justify-start`}>
-          <span className="text-white bg-[#5B93FF] p-2 rounded-[5px] rounded-bl-none max-w-[350px] mb-2">
-            <span className="text-xs">{message?.content}</span>
-            <span className="text-[10px] flex justify-end opacity-80">
-              {message?.created_at?.toDateString()}
+      {messages?.map((message: any, index) => {
+        const milliseconds = message?.time.seconds * 1000 + message?.time.nanoseconds / 1000000;
+        const messageTime = new Date(milliseconds);
+
+        return (
+          <div key={index} className={`flex justify-start`}>
+            <span className="text-white bg-[#5B93FF] p-2 rounded-[5px] rounded-bl-none max-w-[350px] mb-2">
+              <span className="text-xs">{message?.messageContent}</span>
+              <span className="text-[10px] flex justify-end opacity-80">{messageTime.toDateString()}</span>
             </span>
-          </span>
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -143,9 +178,7 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
 
   return (
     <div className="flex justify-between items-center relative">
-      <span className="text-gray-400 absolute left-4">
-        {/* <GoPaperclip /> */}
-      </span>
+      <span className="text-gray-400 absolute left-4">{/* <GoPaperclip /> */}</span>
       <input
         type="text"
         value={message}
@@ -163,29 +196,149 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
 
 // LeftPanel.tsx
 interface LeftPanelProps {
-  messages: Chat[];
   onChatSelect: (chatId: string) => void;
   handleOpenModal: () => void;
+  users: any;
+  allChats: any;
+  fatchChats: any;
+  setSelectedClientId: any;
+  selectedClientId: any;
+  setSelectedBusinessId: any;
+  selectedBusinessId: any;
 }
 
 // LeftPanel Component
 const LeftPanel: React.FC<LeftPanelProps> = ({
-  messages,
   onChatSelect,
   handleOpenModal,
+  users,
+  allChats,
+  fatchChats,
+  selectedClientId,
+  setSelectedClientId,
+  selectedBusinessId,
+  setSelectedBusinessId,
 }) => {
+  const filterOnlyUserList = users && users?.filter((item: any) => item?.type === "user");
+
+  const filterOnlyBusinessList = users && users?.filter((item: any) => item?.type === "business");
+
+  const [selectedUserType, setSelectedUserType] = useState("");
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isDirty, isValid },
+    setValue,
+    getValues,
+    control,
+    clearErrors,
+  } = useForm({
+    defaultValues: {
+      type: "",
+      userList: "",
+      businessList: "",
+    },
+  });
+
+  const onChangeBusiness = async (business_Id: any) => {
+    setSelectedBusinessId(business_Id);
+    setValue("businessList", business_Id);
+
+    const FindBusinessName = filterOnlyBusinessList?.find((item: any) => item?.id === business_Id)?.name;
+    const FindClientName = filterOnlyUserList?.find((item: any) => item?.id === selectedClientId)?.name;
+
+    console.log("FindBusinessName", FindBusinessName, FindClientName);
+
+    // const payload = {
+    //   type: selectedUserType,
+    //   clintId: selectedClientId,
+    //   businessId: business_Id,
+    //   created_at: new Date(),
+    // };
+    const payload = {
+      type: selectedUserType,
+      clintUserInfo: { id: selectedClientId, name: FindClientName },
+      businessUserInfo: { id: business_Id, name: FindBusinessName },
+      created_at: new Date(),
+    };
+    const ID = uuidv4();
+    console.log("payload ID:", payload, ID);
+
+    if (selectedUserType === "user") {
+      if (allChats?.some((item: any) => item.businessUserInfo.id === business_Id && item.clintUserInfo.id === selectedClientId)) {
+        alert("Alerady Chat added!");
+      } else {
+        await setDoc(doc(db, "chats", ID), payload);
+        fatchChats();
+        alert("Chat add sucessfully");
+      }
+    }
+  };
+
   return (
     <div className="w-1/3 h-[calc(100vh-65px)] bg-white rounded-xl p-5">
       <div className="flex justify-between">
-        <span className="font-semibold text-[20px]">Firebase Chat</span>
-        <PersonAddAltIcon
-          sx={{ color: "black" }}
-          onClick={handleOpenModal}
-          className="hover:cursor-pointer"
+        <span className="font-semibold text-[20px] text-[black]">Firebase Chat</span>
+        <PersonAddAltIcon sx={{ color: "black" }} onClick={handleOpenModal} className="hover:cursor-pointer" />
+      </div>
+      <div className="flex flex-col gap-1 mb-5 mt-3">
+        <span className="text-[16px] font-semibold text-[#000000]">Type</span>
+        <FormSelectField
+          name="type"
+          control={control}
+          onChange={(e: any) => {
+            setSelectedUserType(e.target.value);
+            setValue("type", e.target.value);
+            setValue("userList", "");
+            setValue("businessList", "");
+          }}
+          options={[
+            { value: "business", label: "Business" },
+            { value: "user", label: "User" },
+          ]}
         />
       </div>
+
+      {selectedUserType === "user" && (
+        <div className="flex flex-col gap-1 mb-5 mt-3">
+          <span className="text-[16px] font-semibold text-[#000000]">User List</span>
+          <FormSelectField
+            name="userList"
+            control={control}
+            onChange={(e: any) => {
+              console.log("eee", e.target.value);
+              setSelectedClientId(e.target.value);
+              setValue("userList", e.target.value);
+            }}
+            options={filterOnlyUserList?.map((item: any) => ({
+              value: item.id,
+              label: item.name,
+            }))}
+          />
+        </div>
+      )}
+
+      {selectedUserType && (
+        <div className="flex flex-col gap-1 mb-5 mt-3">
+          <span className="text-[16px] font-semibold text-[#000000]">Business List</span>
+          <FormSelectField
+            name="businessList"
+            control={control}
+            onChange={(e: any) => {
+              console.log("eee", e.target.value);
+              onChangeBusiness(e.target.value);
+            }}
+            options={filterOnlyBusinessList?.map((item: any) => ({
+              value: item.id,
+              label: item.name,
+            }))}
+          />
+        </div>
+      )}
       <SearchBar />
-      <MessageList messages={messages} onChatSelect={onChatSelect} />
+      {/* <MessageList messages={messages} onChatSelect={onChatSelect} /> */}
+      {selectedUserType === "user" && <ChatsList chats={allChats} users={users} selectedClientId={selectedClientId} onChatSelect={onChatSelect} />}
     </div>
   );
 };
@@ -196,23 +349,16 @@ interface ChatDetails {
 }
 
 interface RightPanelProps {
-  chatDetails: ChatDetails;
+  chatDetails: any;
   messages: Chat[];
   onSendMessage: (message: string) => void;
 }
 
 // RightPanel.tsx
-const RightPanel = ({
-  chatDetails,
-  messages,
-  onSendMessage,
-}: RightPanelProps) => {
+const RightPanel = ({ chatDetails, messages, onSendMessage }: RightPanelProps) => {
   return (
     <div className="w-2/3 h-[calc(100vh-65px)] bg-white rounded-xl p-5">
-      <ChatHeader
-        chatTitle={chatDetails.title}
-        chatSubtitle={chatDetails.subtitle}
-      />
+      <ChatHeader chatTitle={chatDetails?.businessUserInfo?.name} chatSubtitle={chatDetails?.businessUserInfo?.name} />
       <ChatBody messages={messages} />
       <ChatInput onSendMessage={onSendMessage} />
     </div>
@@ -229,62 +375,115 @@ const Chat = () => {
   // State variables
   const [userModal, setuserModal] = useState<boolean>(false);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Chat[]>([
-    {
-      id: "1",
-      chatId: "1",
-      content: "Hello, how can I help you?",
-      created_at: new Date(),
-      sender: "Agent",
-    },
-    {
-      id: "2",
-      chatId: "2",
-      content: "I have a question about my order.",
-      created_at: new Date(),
-      sender: "User",
-    },
-    // ...more messages...
-  ]);
-  const [chatDetails, setChatDetails] = useState<ChatDetails>({
-    title: "Chat Title", // Example chat title
-    subtitle: "Chat Subtitle", // Example chat subtitle
-  });
+  const [messages, setMessages] = useState<Chat[]>([]);
+
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedBusinessId, setSelectedBusinessId] = useState("");
+
+  const [chatDetails, setChatDetails] = useState<any>({});
 
   const handleOpenUserModal = () => setuserModal(true);
 
   const handleCloseUserModal = () => setuserModal(false);
 
   // Handler for selecting a chat
-  const handleChatSelect = (chatId: string) => {
-    setSelectedChatId(chatId);
-    // Update chatDetails logic goes here
-    // Example:
-    const newChatDetails = {
-      title: "New Chat Title", // Replace with dynamic data
-      subtitle: "New Chat Subtitle",
-    };
-    setChatDetails(newChatDetails);
+  const handleChatSelect = async (chats: any) => {
+    console.log("chats*/*/", chats);
+
+    // setSelectedChatId(chatId);
+    // // Update chatDetails logic goes here
+    // // Example:
+    // const newChatDetails = {
+    //   title: "New Chat Title", // Replace with dynamic data
+    //   subtitle: "New Chat Subtitle",
+    // };
+    setChatDetails(chats);
   };
 
-  const filteredMessages = useMemo(() => {
-    return messages.filter((message) => message.chatId === selectedChatId);
-  }, [messages, selectedChatId]);
+  const getCatMessages = async () => {
+    const docRef = doc(db, "chats", chatDetails?.id);
+    const docSnapshot = await getDoc(docRef);
+
+    if (docSnapshot.exists()) {
+      const data = docSnapshot.data();
+      console.log("data calll", data);
+      setMessages(data?.messages);
+    }
+  };
+
+  useEffect(() => {
+    if (chatDetails?.id) {
+      getCatMessages();
+    }
+  }, [chatDetails]);
+
+  // const filteredMessages = useMemo(() => {
+  //   return messages?.filter((message) => message.chatId === selectedChatId);
+  // }, [messages, selectedChatId]);
 
   // Assuming messages are already sorted by timestamp
-  const lastMessages: Chat[] = useMemo(() => {
-    const groupedMessages = messages.reduce((acc: GroupedMessages, message) => {
-      acc[message.chatId] = message;
-      return acc;
-    }, {});
+  // const lastMessages: Chat[] = useMemo(() => {
+  //   const groupedMessages = messages?.reduce((acc: GroupedMessages, message) => {
+  //     acc[message.chatId] = message;
+  //     return acc;
+  //   }, {});
 
-    return Object.values(groupedMessages);
-  }, [messages]);
+  //   return Object.values(groupedMessages);
+  // }, [messages]);
 
   // Handler for sending a message
-  const handleSendMessage = async (messageContent: string) => {};
+  const handleSendMessage = async (messageContent: string) => {
+    console.log("messageContent", messageContent, "1111", chatDetails);
+
+    const messageData: any = {
+      senderID: chatDetails?.clintUserInfo?.id,
+      senderName: chatDetails?.clintUserInfo?.name,
+      messageContent: messageContent,
+      time: new Date(),
+    };
+
+    if (chatDetails?.clintUserInfo?.id && chatDetails) {
+      try {
+        const docRef = doc(db, "chats", chatDetails?.id);
+        const docSnapshot = await getDoc(docRef);
+
+        if (docSnapshot.exists()) {
+          const data = docSnapshot.data();
+
+          const MeargeData = data?.messages ? [...data?.messages, messageData] : [messageData];
+
+          await setDoc(docRef, { ["messages"]: MeargeData }, { merge: true });
+          setMessages(MeargeData);
+
+          console.log("Document successfully updated!");
+        } else {
+          console.log("Document does not exist.");
+        }
+      } catch (error) {
+        console.error("Error updating document: ", error);
+      }
+    }
+  };
 
   const [users, setUsers] = useState<User[]>([]);
+  const [allChats, setAllChats] = useState<User[]>([]);
+
+  console.log("allChats===", allChats);
+
+  const fatchChats = async () => {
+    const chatsRef = collection(db, "chats");
+    const q = query(chatsRef);
+    const querySnapshot = await getDocs(q);
+    const chatsList: User[] = querySnapshot.docs.map((doc) => ({
+      ...doc.data(),
+      id: doc.id,
+    }));
+    setAllChats(chatsList);
+  };
+
+  useEffect(() => {
+    fatchChats();
+  }, []);
 
   useEffect(() => {
     async function fetchUsers() {
@@ -307,19 +506,20 @@ const Chat = () => {
   return (
     <div className="p-8 w-full flex gap-6">
       <LeftPanel
-        messages={lastMessages}
+        // messages={lastMessages}
         onChatSelect={handleChatSelect}
         handleOpenModal={handleOpenUserModal}
+        users={users}
+        fatchChats={fatchChats}
+        allChats={allChats}
+        setSelectedClientId={setSelectedClientId}
+        selectedClientId={selectedClientId}
+        selectedBusinessId={selectedBusinessId}
+        setSelectedBusinessId={setSelectedBusinessId}
       />
-      <RightPanel
-        chatDetails={chatDetails}
-        messages={filteredMessages}
-        onSendMessage={handleSendMessage}
-      />
-      <AddEditUserModal
-        open={userModal}
-        handleCloseModal={handleCloseUserModal}
-      />
+      {/* <RightPanel chatDetails={chatDetails} messages={filteredMessages} onSendMessage={handleSendMessage} /> */}
+      <RightPanel chatDetails={chatDetails} messages={messages} onSendMessage={handleSendMessage} />
+      <AddEditUserModal open={userModal} handleCloseModal={handleCloseUserModal} />
     </div>
   );
 };

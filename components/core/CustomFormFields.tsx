@@ -60,9 +60,7 @@ export const FormInputField = ({
           style={{ fontSize: "15px" }}
           sx={{
             "&:hover fieldset": {
-              borderColor: disabled
-                ? "#868585 !important"
-                : "#ffa500 !important",
+              borderColor: disabled ? "#868585 !important" : "#ffa500 !important",
             },
             "&.Mui-focused fieldset": {
               borderColor: "#ffa500 !important",
@@ -71,34 +69,21 @@ export const FormInputField = ({
               borderColor: "red !important",
             },
           }}
-          className={`${
-            disabled
-              ? "!tw-text-[#868585] !tw-border-[#868585] !tw-bg-[#E7E8EA]"
-              : ""
-          } ${!multiline ? "!tw-h-[38px]" : "!tw-h-auto"} ${className}`}
+          className={`${disabled ? "!tw-text-[#868585] !tw-border-[#868585] !tw-bg-[#E7E8EA]" : ""} ${
+            !multiline ? "!tw-h-[38px]" : "!tw-h-auto"
+          } ${className}`}
           endAdornment={
             showIcon ? (
               <InputAdornment position="end">
                 {passwordMatched ? (
                   <IconButton edge="end">
-                    <CheckCircleIcon
-                      fontSize="large"
-                      className="!tw-text-[#00A451]"
-                    />
+                    <CheckCircleIcon fontSize="large" className="!tw-text-[#00A451]" />
                   </IconButton>
                 ) : icon ? (
                   <IconButton edge="end">{icon}</IconButton>
                 ) : (
-                  <IconButton
-                    onClick={() => setShowPassword(!showPassword)}
-                    onMouseDown={() => setShowPassword(!showPassword)}
-                    edge="end"
-                  >
-                    {!showPassword ? (
-                      <VisibilityOffIcon fontSize="large" />
-                    ) : (
-                      <VisibilityIcon fontSize="large" />
-                    )}
+                  <IconButton onClick={() => setShowPassword(!showPassword)} onMouseDown={() => setShowPassword(!showPassword)} edge="end">
+                    {!showPassword ? <VisibilityOffIcon fontSize="large" /> : <VisibilityIcon fontSize="large" />}
                   </IconButton>
                 )}
               </InputAdornment>
@@ -115,30 +100,19 @@ export const FormCheckboxField = ({ name, control, label }: any) => (
   <Controller
     name={name}
     control={control}
-    render={({ field }) => (
-      <FormControlLabel
-        control={<Checkbox {...field} checked={field.value} />}
-        label={label}
-      />
-    )}
+    render={({ field }) => <FormControlLabel control={<Checkbox {...field} checked={field.value} />} label={label} />}
   />
 );
 
 // Select Component
-export const FormSelectField = ({
-  name,
-  control,
-  options,
-  rules,
-  ...props
-}: any) => {
+export const FormSelectField = ({ name, control, options, rules, ...props }: any) => {
   return (
     <Controller
       name={name}
       control={control}
       rules={rules}
       render={({ field }) => {
-        console.log("field :", field);
+        // console.log("field :", field);
         return (
           <Select
             {...field}
@@ -196,44 +170,23 @@ export const FormDatePickerField = ({ name, control, ...props }: any) => {
   );
 };
 
-export const FormAutocompleteField = ({
-  control,
-  name,
-  options = [],
-  multiple,
-  onChangeValue = () => {},
-  ...props
-}: any) => {
+export const FormAutocompleteField = ({ control, name, options = [], multiple, onChangeValue = () => {}, ...props }: any) => {
   return (
     <Controller
       name={name}
       control={control}
-      render={({
-        field: { onChange, onBlur, value, ref },
-        fieldState: { error },
-      }) => (
+      render={({ field: { onChange, onBlur, value, ref }, fieldState: { error } }) => (
         <Autocomplete
           multiple={multiple}
           options={options}
           getOptionLabel={(option) => option.label || ""}
           value={
             multiple
-              ? value.map(
-                  (selectedValue: any) =>
-                    options.find(
-                      (option: any) => option.value === selectedValue
-                    ) || null
-                )
+              ? value.map((selectedValue: any) => options.find((option: any) => option.value === selectedValue) || null)
               : options.find((option: any) => option.value === value) || null
           }
           onChange={(event, newValue: any) => {
-            const selectedValues = multiple
-              ? newValue
-                ? newValue.map((item: any) => item.value)
-                : []
-              : newValue
-              ? [newValue.value]
-              : [];
+            const selectedValues = multiple ? (newValue ? newValue.map((item: any) => item.value) : []) : newValue ? [newValue.value] : [];
 
             onChange(selectedValues);
             onChangeValue(selectedValues);
@@ -243,9 +196,7 @@ export const FormAutocompleteField = ({
             value.map((option: any, index: number) => (
               // eslint-disable-next-line react/jsx-key
               <Chip
-                deleteIcon={
-                  <CloseIcon className="!tw-text-[#fff] !tw-text-[16px]" />
-                }
+                deleteIcon={<CloseIcon className="!tw-text-[#fff] !tw-text-[16px]" />}
                 label={option.label}
                 {...getTagProps({ index })}
                 sx={{

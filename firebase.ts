@@ -1,20 +1,18 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore/lite";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+import { initializeApp } from "firebase/app";
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyA_UcZuSbXC6UuTxajBQjwMLuExttq1Wos",
-  authDomain: "chat-app-57147.firebaseapp.com",
-  projectId: "chat-app-57147",
-  storageBucket: "chat-app-57147.appspot.com",
-  messagingSenderId: "290718097532",
-  appId: "1:290718097532:web:f2b2023f1815b09f69a9f9",
+  apiKey: "AIzaSyD7eO6faxqE-YIf2oO77JVQANU8VMlqOhs",
+  authDomain: "scaleplus-dda3e.firebaseapp.com",
+  projectId: "scaleplus-dda3e",
+  storageBucket: "scaleplus-dda3e.appspot.com",
+  messagingSenderId: "384477868567",
+  appId: "1:384477868567:web:55c060f3c656cc0e952252",
+  measurementId: "G-2FZ7GJZ2V2",
 };
 
-// Initialize Firebase
+// Create a Firestore instance
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore();
 
