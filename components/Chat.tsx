@@ -60,8 +60,8 @@ interface ChatsListProps {
 
 const ChatsList = ({ chats, users, selectedClientId, selectedBusinessId, onChatSelect }: ChatsListProps) => {
   return (
-    <div className="overflow-y-auto h-[calc(100vh-240px)] scrollbar-none">
-      {chats.map((chats: any) => {
+    <div className="overflow-y-auto max-h-[400px] scrollbar-none">
+      {chats?.map((chats: any) => {
         // const FindName = users?.find((item: any) => item?.id === chats.businessId)?.name;
         const lastMessage = chats?.messages?.length > 0 && chats?.messages[chats?.messages?.length - 1];
         console.log("chats-=-", lastMessage?.messageContent);
