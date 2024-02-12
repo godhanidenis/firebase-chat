@@ -7,7 +7,7 @@ import LoadingButton from "@mui/lab/LoadingButton";
 import SaveIcon from "@mui/icons-material/Save";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "@/firebase";
-import { doc, setDoc } from "firebase/firestore/lite";
+import { doc, setDoc } from "firebase/firestore";
 
 const style = {
   position: "absolute" as "absolute",

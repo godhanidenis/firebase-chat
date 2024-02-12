@@ -1,21 +1,20 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Chat, User } from "@/types/chat";
 import PersonAddAltIcon from "@mui/icons-material/PersonAddAlt";
 import AddEditUserModal from "./AddEditUserModal";
 import SearchIcon from "@mui/icons-material/Search";
-import { DocumentData, QuerySnapshot, collection, getDocs, query } from "firebase/firestore/lite";
+// import { DocumentData, QuerySnapshot, collection, getDocs, query } from "firebase/firestore/lite";
 import { db } from "@/firebase";
 import { Avatar } from "@mui/material";
 import { stringAvatar } from "@/utils";
 import { FormSelectField } from "./core/CustomFormFields";
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
-import { doc, setDoc, updateDoc, getDoc } from "firebase/firestore/lite";
-import { onSnapshot } from "firebase/firestore";
-
+// import { doc, setDoc, updateDoc, getDoc } from "firebase/firestore/lite";
+import { onSnapshot, collection, getDocs, query, getDoc, doc, setDoc } from "firebase/firestore";
 // SearchBar Component
 const SearchBar = () => {
   return (
@@ -55,25 +54,48 @@ interface ChatsListProps {
   chats: Chat[];
   users: any;
   selectedClientId: any;
+  selectedBusinessId: any;
   onChatSelect: (chatId: string) => void;
 }
 
-const ChatsList = ({ chats, users, selectedClientId, onChatSelect }: ChatsListProps) => {
+const ChatsList = ({ chats, users, selectedClientId, selectedBusinessId, onChatSelect }: ChatsListProps) => {
   return (
     <div className="overflow-y-auto h-[calc(100vh-240px)] scrollbar-none">
       {chats.map((chats: any) => {
         // const FindName = users?.find((item: any) => item?.id === chats.businessId)?.name;
+        const lastMessage = chats?.messages?.length > 0 && chats?.messages[chats?.messages?.length - 1];
+        console.log("chats-=-", lastMessage?.messageContent);
+
         if (selectedClientId === chats?.clintUserInfo?.id) {
           return (
             <div key={chats.id} onClick={() => onChatSelect(chats)} className="cursor-pointer">
               <div className="flex items-center justify-between py-3 px-4 bg-white border-b">
                 <div className="flex items-center gap-3">
                   <Avatar {...stringAvatar(`${chats.businessUserInfo.name} D`)} />
-                  <p className="text-xs text-gray-500">{chats.businessUserInfo.name}</p>
+                  <div>
+                    <p className="text-xs text-gray-500">{chats.businessUserInfo.name}</p>
+                    <p className="text-xs text-gray-500">{lastMessage?.messageContent}</p>
+                  </div>
                 </div>
               </div>
             </div>
           );
+        } else if (selectedBusinessId === chats?.businessUserInfo?.id) {
+          if (chats?.messages?.length > 0) {
+            return (
+              <div key={chats.id} onClick={() => onChatSelect(chats)} className="cursor-pointer">
+                <div className="flex items-center justify-between py-3 px-4 bg-white border-b">
+                  <div className="flex items-center gap-3">
+                    <Avatar {...stringAvatar(`${chats.clintUserInfo.name} D`)} />
+                    <div>
+                      <p className="text-xs text-gray-500">{chats.clintUserInfo.name}</p>
+                      <p className="text-xs text-gray-500">{lastMessage?.messageContent}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
         }
       })}
     </div>
@@ -126,10 +148,25 @@ const ChatHeader = ({ chatTitle, chatSubtitle }: ChatHeaderProps) => {
 
 interface ChatBodyProps {
   messages: Chat[];
+  selectedUserType: any;
+  selectedBusinessId: any;
+  selectedClientId: any;
 }
 
 // ChatBody Component
-const ChatBody = ({ messages }: ChatBodyProps) => {
+const ChatBody = ({ messages, selectedUserType, selectedClientId, selectedBusinessId }: ChatBodyProps) => {
+  console.log("messages/*/*", messages);
+
+  const messagesEndRef = useRef<any>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
   return (
     <div className="overflow-y-auto h-[calc(100vh-240px)] scrollbar-none my-3">
       {messages?.map((message: any, index) => {
@@ -137,14 +174,30 @@ const ChatBody = ({ messages }: ChatBodyProps) => {
         const messageTime = new Date(milliseconds);
 
         return (
-          <div key={index} className={`flex justify-start`}>
-            <span className="text-white bg-[#5B93FF] p-2 rounded-[5px] rounded-bl-none max-w-[350px] mb-2">
+          <div
+            key={index}
+            className={`flex justify-start ${
+              (selectedUserType === "user" && selectedClientId === message?.senderID) ||
+              (selectedUserType !== "user" && selectedBusinessId === message?.senderID)
+                ? "justify-end"
+                : "justify-start"
+            }`}
+          >
+            <span
+              className={`text-white p-2 rounded-[5px] rounded-bl-none max-w-[350px] mb-2 ${
+                (selectedUserType === "user" && selectedClientId === message?.senderID) ||
+                (selectedUserType !== "user" && selectedBusinessId === message?.senderID)
+                  ? "bg-[#5B93FF]"
+                  : "bg-[green]"
+              }`}
+            >
               <span className="text-xs">{message?.messageContent}</span>
               <span className="text-[10px] flex justify-end opacity-80">{messageTime.toDateString()}</span>
             </span>
           </div>
         );
       })}
+      <div ref={messagesEndRef} />
     </div>
   );
 };
@@ -200,11 +253,12 @@ interface LeftPanelProps {
   handleOpenModal: () => void;
   users: any;
   allChats: any;
-  fatchChats: any;
   setSelectedClientId: any;
   selectedClientId: any;
   setSelectedBusinessId: any;
   selectedBusinessId: any;
+  selectedUserType: any;
+  setSelectedUserType: any;
 }
 
 // LeftPanel Component
@@ -213,17 +267,16 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   handleOpenModal,
   users,
   allChats,
-  fatchChats,
   selectedClientId,
   setSelectedClientId,
   selectedBusinessId,
   setSelectedBusinessId,
+  selectedUserType,
+  setSelectedUserType,
 }) => {
   const filterOnlyUserList = users && users?.filter((item: any) => item?.type === "user");
 
   const filterOnlyBusinessList = users && users?.filter((item: any) => item?.type === "business");
-
-  const [selectedUserType, setSelectedUserType] = useState("");
 
   const {
     register,
@@ -270,7 +323,6 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
         alert("Alerady Chat added!");
       } else {
         await setDoc(doc(db, "chats", ID), payload);
-        fatchChats();
         alert("Chat add sucessfully");
       }
     }
@@ -338,7 +390,15 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
       )}
       <SearchBar />
       {/* <MessageList messages={messages} onChatSelect={onChatSelect} /> */}
-      {selectedUserType === "user" && <ChatsList chats={allChats} users={users} selectedClientId={selectedClientId} onChatSelect={onChatSelect} />}
+      {/* {selectedUserType === "user" && ( */}
+      <ChatsList
+        chats={allChats}
+        users={users}
+        selectedClientId={selectedClientId}
+        selectedBusinessId={selectedBusinessId}
+        onChatSelect={onChatSelect}
+      />
+      {/* )} */}
     </div>
   );
 };
@@ -349,17 +409,21 @@ interface ChatDetails {
 }
 
 interface RightPanelProps {
+  selectedUserType: any;
   chatDetails: any;
   messages: Chat[];
   onSendMessage: (message: string) => void;
+  selectedBusinessId: any;
+  selectedClientId: any;
 }
 
 // RightPanel.tsx
-const RightPanel = ({ chatDetails, messages, onSendMessage }: RightPanelProps) => {
+const RightPanel = ({ selectedUserType, selectedBusinessId, selectedClientId, chatDetails, messages, onSendMessage }: RightPanelProps) => {
+  const chatTitle = selectedUserType === "user" ? chatDetails?.businessUserInfo?.name : chatDetails?.clintUserInfo?.name;
   return (
     <div className="w-2/3 h-[calc(100vh-65px)] bg-white rounded-xl p-5">
-      <ChatHeader chatTitle={chatDetails?.businessUserInfo?.name} chatSubtitle={chatDetails?.businessUserInfo?.name} />
-      <ChatBody messages={messages} />
+      <ChatHeader chatTitle={chatTitle} chatSubtitle={chatTitle} />
+      <ChatBody messages={messages} selectedUserType={selectedUserType} selectedBusinessId={selectedBusinessId} selectedClientId={selectedClientId} />
       <ChatInput onSendMessage={onSendMessage} />
     </div>
   );
@@ -376,11 +440,13 @@ const Chat = () => {
   const [userModal, setuserModal] = useState<boolean>(false);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Chat[]>([]);
+  console.log("messages////", messages);
 
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedBusinessId, setSelectedBusinessId] = useState("");
 
   const [chatDetails, setChatDetails] = useState<any>({});
+  const [selectedUserType, setSelectedUserType] = useState("");
 
   const handleOpenUserModal = () => setuserModal(true);
 
@@ -389,33 +455,21 @@ const Chat = () => {
   // Handler for selecting a chat
   const handleChatSelect = async (chats: any) => {
     console.log("chats*/*/", chats);
-
-    // setSelectedChatId(chatId);
-    // // Update chatDetails logic goes here
-    // // Example:
-    // const newChatDetails = {
-    //   title: "New Chat Title", // Replace with dynamic data
-    //   subtitle: "New Chat Subtitle",
-    // };
     setChatDetails(chats);
   };
 
-  const getCatMessages = async () => {
-    const docRef = doc(db, "chats", chatDetails?.id);
-    const docSnapshot = await getDoc(docRef);
-
-    if (docSnapshot.exists()) {
-      const data = docSnapshot.data();
-      console.log("data calll", data);
-      setMessages(data?.messages);
-    }
-  };
-
   useEffect(() => {
-    if (chatDetails?.id) {
-      getCatMessages();
-    }
-  }, [chatDetails]);
+    if (!chatDetails?.id) return;
+    const messagesLive = onSnapshot(doc(db, "chats", chatDetails?.id), (doc: any) => {
+      if (doc.exists()) {
+        setMessages(doc.data().messages);
+      } else {
+        console.log("No such document!");
+      }
+    });
+
+    return () => messagesLive();
+  }, [chatDetails?.id]);
 
   // const filteredMessages = useMemo(() => {
   //   return messages?.filter((message) => message.chatId === selectedChatId);
@@ -436,8 +490,8 @@ const Chat = () => {
     console.log("messageContent", messageContent, "1111", chatDetails);
 
     const messageData: any = {
-      senderID: chatDetails?.clintUserInfo?.id,
-      senderName: chatDetails?.clintUserInfo?.name,
+      senderID: selectedUserType === "user" ? chatDetails?.clintUserInfo?.id : chatDetails?.businessUserInfo?.id,
+      senderName: selectedUserType === "user" ? chatDetails?.clintUserInfo?.name : chatDetails?.businessUserInfo?.name,
       messageContent: messageContent,
       time: new Date(),
     };
@@ -453,8 +507,7 @@ const Chat = () => {
           const MeargeData = data?.messages ? [...data?.messages, messageData] : [messageData];
 
           await setDoc(docRef, { ["messages"]: MeargeData }, { merge: true });
-          setMessages(MeargeData);
-
+          // setMessages(MeargeData);
           console.log("Document successfully updated!");
         } else {
           console.log("Document does not exist.");
@@ -470,20 +523,35 @@ const Chat = () => {
 
   console.log("allChats===", allChats);
 
-  const fatchChats = async () => {
-    const chatsRef = collection(db, "chats");
-    const q = query(chatsRef);
-    const querySnapshot = await getDocs(q);
-    const chatsList: User[] = querySnapshot.docs.map((doc) => ({
-      ...doc.data(),
-      id: doc.id,
-    }));
-    setAllChats(chatsList);
-  };
+  // const fatchChats = async () => {
+  //   const chatsRef = collection(db, "chats");
+  //   const q = query(chatsRef);
+  //   const querySnapshot = await getDocs(q);
+  //   const chatsList: User[] = querySnapshot.docs.map((doc) => ({
+  //     ...doc.data(),
+  //     id: doc.id,
+  //   }));
+  //   // setAllChats(chatsList);
+  // };
 
   useEffect(() => {
-    fatchChats();
-  }, []);
+    const fetchChats = () => {
+      const chatsRef = collection(db, "chats");
+      const unsubscribe = onSnapshot(chatsRef, (querySnapshot) => {
+        const updatedChats: any = [];
+        querySnapshot.forEach((doc) => {
+          updatedChats.push({ id: doc.id, ...doc.data() });
+        });
+        setAllChats(updatedChats);
+      });
+      return () => unsubscribe();
+    };
+    fetchChats();
+  }, []); // Empty dependency array means it will only run once on component mount
+
+  // useEffect(() => {
+  //   // fatchChats();
+  // }, []);
 
   useEffect(() => {
     async function fetchUsers() {
@@ -510,15 +578,24 @@ const Chat = () => {
         onChatSelect={handleChatSelect}
         handleOpenModal={handleOpenUserModal}
         users={users}
-        fatchChats={fatchChats}
+        // fatchChats={fatchChats}
         allChats={allChats}
+        selectedUserType={selectedUserType}
         setSelectedClientId={setSelectedClientId}
+        setSelectedUserType={setSelectedUserType}
         selectedClientId={selectedClientId}
         selectedBusinessId={selectedBusinessId}
         setSelectedBusinessId={setSelectedBusinessId}
       />
       {/* <RightPanel chatDetails={chatDetails} messages={filteredMessages} onSendMessage={handleSendMessage} /> */}
-      <RightPanel chatDetails={chatDetails} messages={messages} onSendMessage={handleSendMessage} />
+      <RightPanel
+        chatDetails={chatDetails}
+        messages={messages}
+        selectedUserType={selectedUserType}
+        selectedBusinessId={selectedBusinessId}
+        selectedClientId={selectedClientId}
+        onSendMessage={handleSendMessage}
+      />
       <AddEditUserModal open={userModal} handleCloseModal={handleCloseUserModal} />
     </div>
   );
