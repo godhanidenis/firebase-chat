@@ -15,6 +15,7 @@ import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
 // import { doc, setDoc, updateDoc, getDoc } from "firebase/firestore/lite";
 import { onSnapshot, collection, getDocs, query, getDoc, doc, setDoc } from "firebase/firestore";
+import moment from "moment";
 // SearchBar Component
 const SearchBar = ({ setSearchText }: any) => {
   return (
@@ -61,6 +62,8 @@ interface ChatsListProps {
 }
 
 const ChatsList = ({ chats, searchText, users, selectedClientId, selectedBusinessId, onChatSelect }: ChatsListProps) => {
+  console.log("usersChats", users);
+
   const filteredData = chats?.filter(
     (option: any) =>
       (selectedClientId === option?.clintUserInfo?.id
@@ -77,32 +80,38 @@ const ChatsList = ({ chats, searchText, users, selectedClientId, selectedBusines
         console.log("chats-=-", lastMessage?.messageContent);
 
         if (selectedClientId === chats?.clintUserInfo?.id) {
+          const findUserOnlineOrOffline = users?.find((item: any) => item?.id === chats?.businessUserInfo?.id);
           return (
             <div key={chats.id} onClick={() => onChatSelect(chats)} className="cursor-pointer">
               <div className="flex items-center justify-between py-3 px-4 bg-white border-b">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 w-full">
                   <Avatar {...stringAvatar(`${chats.businessUserInfo.name} D`)} />
                   <div>
                     <p className="text-xs text-gray-500">{chats.businessUserInfo.name}</p>
                     <p className="text-xs text-gray-500">{lastMessage?.messageContent}</p>
                   </div>
-                  {/* <p className="text-xs text-gray-500">On /Off</p> */}
+                  <p className={`text-xs ml-auto text-gray-500 ${findUserOnlineOrOffline?.is_online ? " text-green-500" : "text-gray-500"}`}>
+                    {findUserOnlineOrOffline?.is_online ? "Online" : "Offline"}
+                  </p>
                 </div>
               </div>
             </div>
           );
         } else if (selectedBusinessId === chats?.businessUserInfo?.id) {
           if (chats?.messages?.length > 0) {
+            const findUserOnlineOrOffline = users?.find((item: any) => item?.id === chats?.clintUserInfo?.id);
             return (
               <div key={chats.id} onClick={() => onChatSelect(chats)} className="cursor-pointer">
                 <div className="flex items-center justify-between py-3 px-4 bg-white border-b">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 w-full">
                     <Avatar {...stringAvatar(`${chats.clintUserInfo.name} D`)} />
                     <div>
                       <p className="text-xs text-gray-500">{chats.clintUserInfo.name}</p>
                       <p className="text-xs text-gray-500">{lastMessage?.messageContent}</p>
                     </div>
-                    {/* <p className="text-xs text-gray-500">On /Off</p> */}
+                    <p className={`text-xs ml-auto text-gray-500 ${findUserOnlineOrOffline?.is_online ? " text-green-500" : "text-gray-500"}`}>
+                      {findUserOnlineOrOffline?.is_online ? "Online" : "Offline"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -184,6 +193,7 @@ const ChatBody = ({ messages, selectedUserType, selectedClientId, selectedBusine
       {messages?.map((message: any, index) => {
         const milliseconds = message?.time.seconds * 1000 + message?.time.nanoseconds / 1000000;
         const messageTime = new Date(milliseconds);
+        const time = moment(messageTime);
 
         return (
           <div
@@ -204,7 +214,10 @@ const ChatBody = ({ messages, selectedUserType, selectedClientId, selectedBusine
               }`}
             >
               <span className="text-xs">{message?.messageContent}</span>
-              <span className="text-[10px] flex justify-end opacity-80">{messageTime.toDateString()}</span>
+              <span className="text-[10px] flex justify-end opacity-80">
+                {time.format("h:mm a")} {""}
+                {/* {messageTime.toDateString()} */}
+              </span>
             </span>
           </div>
         );
@@ -576,22 +589,77 @@ const Chat = () => {
   // }, []);
 
   useEffect(() => {
-    async function fetchUsers() {
+    // async function fetchUsers() {
+    //   const usersRef = collection(db, "users");
+    //   const q = query(usersRef);
+    //   const querySnapshot = await getDocs(q);
+    //   const usersList: User[] = querySnapshot.docs.map((doc) => ({
+    //     ...doc.data(),
+    //     id: doc.id,
+    //   }));
+    //   setUsers(usersList);
+    // }
+    // fetchUsers();
+
+    const fetchUsers = () => {
       const usersRef = collection(db, "users");
-      const q = query(usersRef);
-      const querySnapshot = await getDocs(q);
-      const usersList: User[] = querySnapshot.docs.map((doc) => ({
-        ...doc.data(),
-        id: doc.id,
-      }));
-      setUsers(usersList);
-    }
+      const unsubscribe = onSnapshot(usersRef, (querySnapshot) => {
+        const updatedUsers: any = [];
+        querySnapshot.forEach((doc) => {
+          updatedUsers.push({ id: doc.id, ...doc.data() });
+        });
+        setUsers(updatedUsers);
+      });
+      return () => unsubscribe();
+    };
     fetchUsers();
   }, []);
 
   useEffect(() => {
     console.log("users:", users);
   }, [users]);
+
+  const [isTabActive, setIsTabActive] = useState(true);
+
+  const updateUserStatus = async () => {
+    const userID = selectedUserType === "user" ? selectedClientId : selectedBusinessId;
+
+    if (userID) {
+      const docRef = doc(db, "users", userID);
+
+      const userLive = onSnapshot(doc(db, "users", userID), (doc: any) => {
+        if (doc.exists()) {
+          setDoc(docRef, { ["is_online"]: isTabActive }, { merge: true });
+        } else {
+          console.log("No such document!");
+        }
+      });
+
+      return () => userLive();
+    }
+  };
+
+  useEffect(() => {
+    updateUserStatus();
+  }, [isTabActive, selectedClientId, selectedBusinessId]);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      setIsTabActive(false);
+    };
+
+    const handleUnload = () => {
+      setIsTabActive(false);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("unload", handleUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("unload", handleUnload);
+    };
+  }, []);
 
   return (
     <div className="p-8 w-full flex gap-6">
