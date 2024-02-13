@@ -16,7 +16,7 @@ import { v4 as uuidv4 } from "uuid";
 // import { doc, setDoc, updateDoc, getDoc } from "firebase/firestore/lite";
 import { onSnapshot, collection, getDocs, query, getDoc, doc, setDoc } from "firebase/firestore";
 // SearchBar Component
-const SearchBar = () => {
+const SearchBar = ({ setSearchText }: any) => {
   return (
     <div className="flex justify-between items-center relative my-6">
       <span className="text-gray-400 absolute left-2">
@@ -26,6 +26,7 @@ const SearchBar = () => {
         type="text"
         className="w-full px-10 h-10 bg-[#F7F7F8] outline-none text-xs text-gray-400 rounded-[5px]"
         placeholder="Search or start new chat"
+        onChange={(e: any) => setSearchText(e.target.value)}
       />
     </div>
   );
@@ -52,16 +53,25 @@ const MessageList = ({ messages, onChatSelect }: MessageListProps) => {
 };
 interface ChatsListProps {
   chats: Chat[];
+  searchText: any;
   users: any;
   selectedClientId: any;
   selectedBusinessId: any;
   onChatSelect: (chatId: string) => void;
 }
 
-const ChatsList = ({ chats, users, selectedClientId, selectedBusinessId, onChatSelect }: ChatsListProps) => {
+const ChatsList = ({ chats, searchText, users, selectedClientId, selectedBusinessId, onChatSelect }: ChatsListProps) => {
+  const filteredData = chats?.filter(
+    (option: any) =>
+      (selectedClientId === option?.clintUserInfo?.id
+        ? option?.businessUserInfo?.name?.toLowerCase().includes(searchText.toLowerCase()) || option?.businessUserInfo?.phone.includes(searchText)
+        : option?.clintUserInfo?.name?.toLowerCase().includes(searchText.toLowerCase()) || option?.clintUserInfo?.phone.includes(searchText)) ||
+      option?.messages.some((message: any) => message?.messageContent?.toLowerCase().includes(searchText.toLowerCase()))
+  );
+
   return (
     <div className="overflow-y-auto max-h-[400px] scrollbar-none">
-      {chats?.map((chats: any) => {
+      {filteredData?.map((chats: any) => {
         // const FindName = users?.find((item: any) => item?.id === chats.businessId)?.name;
         const lastMessage = chats?.messages?.length > 0 && chats?.messages[chats?.messages?.length - 1];
         console.log("chats-=-", lastMessage?.messageContent);
@@ -76,6 +86,7 @@ const ChatsList = ({ chats, users, selectedClientId, selectedBusinessId, onChatS
                     <p className="text-xs text-gray-500">{chats.businessUserInfo.name}</p>
                     <p className="text-xs text-gray-500">{lastMessage?.messageContent}</p>
                   </div>
+                  {/* <p className="text-xs text-gray-500">On /Off</p> */}
                 </div>
               </div>
             </div>
@@ -91,6 +102,7 @@ const ChatsList = ({ chats, users, selectedClientId, selectedBusinessId, onChatS
                       <p className="text-xs text-gray-500">{chats.clintUserInfo.name}</p>
                       <p className="text-xs text-gray-500">{lastMessage?.messageContent}</p>
                     </div>
+                    {/* <p className="text-xs text-gray-500">On /Off</p> */}
                   </div>
                 </div>
               </div>
@@ -277,6 +289,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   const filterOnlyUserList = users && users?.filter((item: any) => item?.type === "user");
 
   const filterOnlyBusinessList = users && users?.filter((item: any) => item?.type === "business");
+  const [searchText, setSearchText] = useState("");
 
   const {
     register,
@@ -298,10 +311,10 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
     setSelectedBusinessId(business_Id);
     setValue("businessList", business_Id);
 
-    const FindBusinessName = filterOnlyBusinessList?.find((item: any) => item?.id === business_Id)?.name;
-    const FindClientName = filterOnlyUserList?.find((item: any) => item?.id === selectedClientId)?.name;
+    const FindBusiness = filterOnlyBusinessList?.find((item: any) => item?.id === business_Id);
+    const FindClient = filterOnlyUserList?.find((item: any) => item?.id === selectedClientId);
 
-    console.log("FindBusinessName", FindBusinessName, FindClientName);
+    console.log("FindBusiness", FindBusiness, FindClient);
 
     // const payload = {
     //   type: selectedUserType,
@@ -311,8 +324,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
     // };
     const payload = {
       type: selectedUserType,
-      clintUserInfo: { id: selectedClientId, name: FindClientName },
-      businessUserInfo: { id: business_Id, name: FindBusinessName },
+      clintUserInfo: { id: selectedClientId, name: FindClient?.name, phone: FindClient?.phone },
+      businessUserInfo: { id: business_Id, name: FindBusiness?.name, phone: FindBusiness?.phone },
       created_at: new Date(),
     };
     const ID = uuidv4();
@@ -326,6 +339,10 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
         alert("Chat add sucessfully");
       }
     }
+  };
+  const onChangeUser = async (user_Id: any) => {
+    setSelectedClientId(user_Id);
+    setValue("userList", user_Id);
   };
 
   return (
@@ -360,8 +377,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             control={control}
             onChange={(e: any) => {
               console.log("eee", e.target.value);
-              setSelectedClientId(e.target.value);
-              setValue("userList", e.target.value);
+
+              onChangeUser(e.target.value);
             }}
             options={filterOnlyUserList?.map((item: any) => ({
               value: item.id,
@@ -388,11 +405,12 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           />
         </div>
       )}
-      <SearchBar />
+      <SearchBar setSearchText={setSearchText} />
       {/* <MessageList messages={messages} onChatSelect={onChatSelect} /> */}
       {/* {selectedUserType === "user" && ( */}
       <ChatsList
         chats={allChats}
+        searchText={searchText}
         users={users}
         selectedClientId={selectedClientId}
         selectedBusinessId={selectedBusinessId}
@@ -523,7 +541,7 @@ const Chat = () => {
 
   console.log("allChats===", allChats);
 
-  // const fatchChats = async () => {
+  // const fatchChatsPrivious = async () => {
   //   const chatsRef = collection(db, "chats");
   //   const q = query(chatsRef);
   //   const querySnapshot = await getDocs(q);
@@ -531,8 +549,12 @@ const Chat = () => {
   //     ...doc.data(),
   //     id: doc.id,
   //   }));
-  //   // setAllChats(chatsList);
+  //   setAllChatsPrevious(chatsList);
   // };
+
+  // useEffect(() => {
+  //   fatchChatsPrivious();
+  // }, []);
 
   useEffect(() => {
     const fetchChats = () => {
