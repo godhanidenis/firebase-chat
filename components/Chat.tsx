@@ -8,7 +8,7 @@ import AddEditUserModal from "./AddEditUserModal";
 import SearchIcon from "@mui/icons-material/Search";
 // import { DocumentData, QuerySnapshot, collection, getDocs, query } from "firebase/firestore/lite";
 import { db } from "@/firebase";
-import { Avatar } from "@mui/material";
+import { Avatar, Box, Modal, Typography } from "@mui/material";
 import { stringAvatar } from "@/utils";
 import { FormSelectField } from "./core/CustomFormFields";
 import { useForm } from "react-hook-form";
@@ -16,6 +16,21 @@ import { v4 as uuidv4 } from "uuid";
 // import { doc, setDoc, updateDoc, getDoc } from "firebase/firestore/lite";
 import { onSnapshot, collection, getDocs, query, getDoc, doc, setDoc } from "firebase/firestore";
 import moment from "moment";
+import { getDownloadURL, getStorage, ref, uploadBytesResumable } from "firebase/storage";
+
+const storage = getStorage();
+
+const uploadModelStyle = {
+  position: "absolute" as "absolute",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  width: 400,
+  bgcolor: "white",
+  border: "2px solid #000",
+  boxShadow: 24,
+  p: 4,
+};
 // SearchBar Component
 const SearchBar = ({ setSearchText }: any) => {
   return (
@@ -69,7 +84,7 @@ const ChatsList = ({ chats, searchText, users, selectedClientId, selectedBusines
       (selectedClientId === option?.clintUserInfo?.id
         ? option?.businessUserInfo?.name?.toLowerCase().includes(searchText.toLowerCase()) || option?.businessUserInfo?.phone.includes(searchText)
         : option?.clintUserInfo?.name?.toLowerCase().includes(searchText.toLowerCase()) || option?.clintUserInfo?.phone.includes(searchText)) ||
-      option?.messages.some((message: any) => message?.messageContent?.toLowerCase().includes(searchText.toLowerCase()))
+      option?.messages?.some((message: any) => message?.messageContent?.toLowerCase().includes(searchText.toLowerCase()))
   );
 
   return (
@@ -78,6 +93,9 @@ const ChatsList = ({ chats, searchText, users, selectedClientId, selectedBusines
         // const FindName = users?.find((item: any) => item?.id === chats.businessId)?.name;
         const lastMessage = chats?.messages?.length > 0 && chats?.messages[chats?.messages?.length - 1];
         console.log("chats-=-", lastMessage?.messageContent);
+
+        const urlPattern = /^(ftp|http|https):\/\/[^ "]+$/;
+        const checkISUrl = urlPattern.test(lastMessage?.messageContent);
 
         if (selectedClientId === chats?.clintUserInfo?.id) {
           const findUserOnlineOrOffline = users?.find((item: any) => item?.id === chats?.businessUserInfo?.id);
@@ -88,7 +106,7 @@ const ChatsList = ({ chats, searchText, users, selectedClientId, selectedBusines
                   <Avatar {...stringAvatar(`${chats.businessUserInfo.name} D`)} />
                   <div>
                     <p className="text-xs text-gray-500">{chats.businessUserInfo.name}</p>
-                    <p className="text-xs text-gray-500">{lastMessage?.messageContent}</p>
+                    <p className="text-xs text-gray-500">{checkISUrl ? "photo" : lastMessage?.messageContent}</p>
                   </div>
                   <p className={`text-xs ml-auto text-gray-500 ${findUserOnlineOrOffline?.is_online ? " text-green-500" : "text-gray-500"}`}>
                     {findUserOnlineOrOffline?.is_online ? "Online" : "Offline"}
@@ -107,7 +125,7 @@ const ChatsList = ({ chats, searchText, users, selectedClientId, selectedBusines
                     <Avatar {...stringAvatar(`${chats.clintUserInfo.name} D`)} />
                     <div>
                       <p className="text-xs text-gray-500">{chats.clintUserInfo.name}</p>
-                      <p className="text-xs text-gray-500">{lastMessage?.messageContent}</p>
+                      <p className="text-xs text-gray-500">{checkISUrl ? "photo" : lastMessage?.messageContent}</p>
                     </div>
                     <p className={`text-xs ml-auto text-gray-500 ${findUserOnlineOrOffline?.is_online ? " text-green-500" : "text-gray-500"}`}>
                       {findUserOnlineOrOffline?.is_online ? "Online" : "Offline"}
@@ -195,6 +213,14 @@ const ChatBody = ({ messages, selectedUserType, selectedClientId, selectedBusine
         const messageTime = new Date(milliseconds);
         const time = moment(messageTime);
 
+        // const momentDate = moment(time);
+        // const finalDate = momentDate.fromNow();
+        // console.log("finalDate/*/*/", finalDate);
+
+        // Regular expression to match URLs
+        const urlPattern = /^(ftp|http|https):\/\/[^ "]+$/;
+        const checkISUrl = urlPattern.test(message?.messageContent);
+
         return (
           <div
             key={index}
@@ -213,7 +239,12 @@ const ChatBody = ({ messages, selectedUserType, selectedClientId, selectedBusine
                   : "bg-[green]"
               }`}
             >
-              <span className="text-xs">{message?.messageContent}</span>
+              {checkISUrl ? (
+                <img src={message?.messageContent} style={{ width: "100px", height: "100px" }} />
+              ) : (
+                <span className="text-xs">{message?.messageContent}</span>
+              )}
+
               <span className="text-[10px] flex justify-end opacity-80">
                 {time.format("h:mm a")} {""}
                 {/* {messageTime.toDateString()} */}
@@ -228,11 +259,16 @@ const ChatBody = ({ messages, selectedUserType, selectedClientId, selectedBusine
 };
 
 interface ChatInputProps {
-  onSendMessage: (message: string) => void;
+  onSendMessage: any;
+  handleUpload: any;
+  setDocument: any;
+  uploading: any;
+  uploadLink: any;
+  handleSendUploadMessage: any;
 }
 
 // ChatInput Component
-const ChatInput = ({ onSendMessage }: ChatInputProps) => {
+const ChatInput = ({ onSendMessage, handleSendUploadMessage, handleUpload, setDocument, uploading, uploadLink }: ChatInputProps) => {
   //state variables
   const [message, setMessage] = useState("");
 
@@ -254,20 +290,90 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
     }
   };
 
+  // const [document, setDocument] = useState<any>(null);
+  // const [uploading, setUploading] = useState(false);
+  // const [uploadLink, setUploadLink] = useState("");
+
+  // Function to handle document selection
+  const handleFileChange = (e: any) => {
+    const selectedFile = e.target.files[0];
+    setDocument(selectedFile);
+  };
+
+  // const handleUpload = async () => {
+  //   if (!document) return;
+
+  //   setUploading(true);
+
+  //   const storageRef = ref(storage, `uploads/${document.name}`);
+  //   const uploadTask = uploadBytesResumable(storageRef, document);
+
+  //   uploadTask.on(
+  //     "state_changed",
+  //     (snapshot) => {
+  //       // Handle progress
+  //     },
+  //     (error) => {
+  //       // Handle errors
+  //       console.error("Error uploading document: ", error);
+  //     },
+  //     () => {
+  //       // Upload completed successfully
+  //       getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+  //         // Pass the download URL to the parent component
+  //         console.log("downloadURL", downloadURL);
+  //         setUploadLink(downloadURL);
+  //         setUploading(false);
+  //       });
+  //     }
+  //   );
+  // };
+
+  const [open, setOpen] = useState(false);
+  const handleOpen = () => setOpen(true);
+  const handleClose = () => setOpen(false);
+
   return (
-    <div className="flex justify-between items-center relative">
-      <span className="text-gray-400 absolute left-4">{/* <GoPaperclip /> */}</span>
-      <input
-        type="text"
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={handleKeyPress} // Add key press handler
-        className="w-full pl-10 pr-16 h-14 bg-[#F7F7F8] outline-none text-xs text-gray-400 rounded-[10px]"
-        placeholder="Type a message..."
-      />
-      <span onClick={handleSend} className="text-[#605BFF] absolute right-4">
-        {/* <RiSendPlaneFill /> */}
-      </span>
+    <div className="flex justify-between items-center gap-3 relative w-full">
+      <div className="w-[70%]">
+        <input
+          type="text"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyPress} // Add key press handler
+          className="w-full pl-10 pr-16 h-14 bg-[#F7F7F8] outline-none text-xs text-gray-400 rounded-[10px]"
+          placeholder="Type a message..."
+        />
+        <span onClick={handleSend} className="text-[#605BFF] absolute right-4">
+          {/* <RiSendPlaneFill /> */}
+        </span>
+      </div>
+      <div className="w-[30%]">
+        <button className="bg-black py-1 px-3 rounded-md" onClick={handleOpen}>
+          upload
+        </button>
+      </div>
+      <Modal open={open} onClose={handleClose} aria-labelledby="modal-modal-title" aria-describedby="modal-modal-description">
+        <Box sx={uploadModelStyle}>
+          <div>
+            <input type="file" className="bg-black w-full mb-4" onChange={handleFileChange} />
+            <button className="bg-black py-1 px-3 rounded-md mb-4" onClick={() => handleUpload()}>
+              {uploading ? "Uploading..." : "Upload"}
+            </button>
+          </div>
+          {uploadLink && (
+            <button
+              onClick={() => {
+                handleSendUploadMessage();
+                handleClose();
+              }}
+              className="bg-green-500 py-1 px-3 rounded-md"
+            >
+              Send
+            </button>
+          )}
+        </Box>
+      </Modal>
     </div>
   );
 };
@@ -443,19 +549,43 @@ interface RightPanelProps {
   selectedUserType: any;
   chatDetails: any;
   messages: Chat[];
-  onSendMessage: (message: string) => void;
+  onSendMessage: any;
   selectedBusinessId: any;
   selectedClientId: any;
+  handleUpload: any;
+  setDocument: any;
+  uploading: any;
+  uploadLink: any;
+  handleSendUploadMessage: any;
 }
 
 // RightPanel.tsx
-const RightPanel = ({ selectedUserType, selectedBusinessId, selectedClientId, chatDetails, messages, onSendMessage }: RightPanelProps) => {
+const RightPanel = ({
+  selectedUserType,
+  selectedBusinessId,
+  selectedClientId,
+  chatDetails,
+  messages,
+  onSendMessage,
+  handleUpload,
+  setDocument,
+  uploading,
+  uploadLink,
+  handleSendUploadMessage,
+}: RightPanelProps) => {
   const chatTitle = selectedUserType === "user" ? chatDetails?.businessUserInfo?.name : chatDetails?.clintUserInfo?.name;
   return (
     <div className="w-2/3 h-[calc(100vh-65px)] bg-white rounded-xl p-5">
       <ChatHeader chatTitle={chatTitle} chatSubtitle={chatTitle} />
       <ChatBody messages={messages} selectedUserType={selectedUserType} selectedBusinessId={selectedBusinessId} selectedClientId={selectedClientId} />
-      <ChatInput onSendMessage={onSendMessage} />
+      <ChatInput
+        onSendMessage={onSendMessage}
+        handleSendUploadMessage={handleSendUploadMessage}
+        handleUpload={handleUpload}
+        setDocument={setDocument}
+        uploading={uploading}
+        uploadLink={uploadLink}
+      />
     </div>
   );
 };
@@ -517,8 +647,8 @@ const Chat = () => {
   // }, [messages]);
 
   // Handler for sending a message
-  const handleSendMessage = async (messageContent: string) => {
-    console.log("messageContent", messageContent, "1111", chatDetails);
+  const handleSendMessage = async (messageContent: any) => {
+    console.log("chatDetails", chatDetails);
 
     const messageData: any = {
       senderID: selectedUserType === "user" ? chatDetails?.clintUserInfo?.id : chatDetails?.businessUserInfo?.id,
@@ -549,25 +679,47 @@ const Chat = () => {
     }
   };
 
+  const [document, setDocument] = useState<any>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadLink, setUploadLink] = useState("");
+
+  const handleUpload = async () => {
+    if (!document) return;
+
+    if (chatDetails?.clintUserInfo?.id || chatDetails?.businessUserInfo?.id) {
+      setUploading(true);
+
+      const storageRef = ref(storage, `uploads/${document.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, document);
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          // Handle progress
+        },
+        (error) => {
+          // Handle errors
+          console.error("Error uploading document: ", error);
+        },
+        () => {
+          // Upload completed successfully
+          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            // Pass the download URL to the parent component
+            console.log("downloadURL", downloadURL);
+            setUploadLink(downloadURL);
+            setUploading(false);
+          });
+        }
+      );
+    }
+  };
+
+  const handleSendUploadMessage = () => {
+    handleSendMessage(uploadLink);
+  };
+
   const [users, setUsers] = useState<User[]>([]);
   const [allChats, setAllChats] = useState<User[]>([]);
-
-  console.log("allChats===", allChats);
-
-  // const fatchChatsPrivious = async () => {
-  //   const chatsRef = collection(db, "chats");
-  //   const q = query(chatsRef);
-  //   const querySnapshot = await getDocs(q);
-  //   const chatsList: User[] = querySnapshot.docs.map((doc) => ({
-  //     ...doc.data(),
-  //     id: doc.id,
-  //   }));
-  //   setAllChatsPrevious(chatsList);
-  // };
-
-  // useEffect(() => {
-  //   fatchChatsPrivious();
-  // }, []);
 
   useEffect(() => {
     const fetchChats = () => {
@@ -583,10 +735,6 @@ const Chat = () => {
     };
     fetchChats();
   }, []); // Empty dependency array means it will only run once on component mount
-
-  // useEffect(() => {
-  //   // fatchChats();
-  // }, []);
 
   useEffect(() => {
     // async function fetchUsers() {
@@ -685,6 +833,11 @@ const Chat = () => {
         selectedBusinessId={selectedBusinessId}
         selectedClientId={selectedClientId}
         onSendMessage={handleSendMessage}
+        handleUpload={handleUpload}
+        setDocument={setDocument}
+        uploading={uploading}
+        uploadLink={uploadLink}
+        handleSendUploadMessage={handleSendUploadMessage}
       />
       <AddEditUserModal open={userModal} handleCloseModal={handleCloseUserModal} />
     </div>
