@@ -1,19 +1,16 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import { Chat, User } from "@/types/chat";
 import PersonAddAltIcon from "@mui/icons-material/PersonAddAlt";
 import AddEditUserModal from "./AddEditUserModal";
 import SearchIcon from "@mui/icons-material/Search";
-// import { DocumentData, QuerySnapshot, collection, getDocs, query } from "firebase/firestore/lite";
 import { db } from "@/firebase";
 import { Avatar, Box, Modal, Typography } from "@mui/material";
 import { stringAvatar } from "@/utils";
 import { FormSelectField } from "./core/CustomFormFields";
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
-// import { doc, setDoc, updateDoc, getDoc } from "firebase/firestore/lite";
 import { onSnapshot, collection, getDocs, query, getDoc, doc, setDoc } from "firebase/firestore";
 import moment from "moment";
 import { getDownloadURL, getStorage, ref, uploadBytesResumable } from "firebase/storage";
@@ -48,25 +45,6 @@ const SearchBar = ({ setSearchText }: any) => {
   );
 };
 
-// MessageList.tsx
-
-interface MessageListProps {
-  messages: Chat[];
-  onChatSelect: (chatId: string) => void;
-}
-
-// MessageList Component
-const MessageList = ({ messages, onChatSelect }: MessageListProps) => {
-  return (
-    <div className="overflow-y-auto h-[calc(100vh-240px)] scrollbar-none">
-      {messages.map((message) => (
-        <div key={message.id} onClick={() => onChatSelect(message?.chatId ?? "")}>
-          <MessageItem message={message} />
-        </div>
-      ))}
-    </div>
-  );
-};
 interface ChatsListProps {
   chats: Chat[];
   searchText: any;
@@ -77,25 +55,18 @@ interface ChatsListProps {
 }
 
 const ChatsList = ({ chats, searchText, users, selectedClientId, selectedBusinessId, onChatSelect }: ChatsListProps) => {
-  console.log("usersChats", users);
-
   const filteredData = chats?.filter(
     (option: any) =>
       (selectedClientId === option?.clintUserInfo?.id
         ? option?.businessUserInfo?.name?.toLowerCase().includes(searchText.toLowerCase()) || option?.businessUserInfo?.phone.includes(searchText)
         : option?.clintUserInfo?.name?.toLowerCase().includes(searchText.toLowerCase()) || option?.clintUserInfo?.phone.includes(searchText)) ||
-      option?.messages?.some((message: any) => message?.messageContent?.toLowerCase().includes(searchText.toLowerCase()))
+      option?.messages?.some((message: any) => message?.messageContent?.message?.toLowerCase().includes(searchText.toLowerCase()))
   );
 
   return (
     <div className="overflow-y-auto max-h-[400px] scrollbar-none">
       {filteredData?.map((chats: any) => {
-        // const FindName = users?.find((item: any) => item?.id === chats.businessId)?.name;
         const lastMessage = chats?.messages?.length > 0 && chats?.messages[chats?.messages?.length - 1];
-        console.log("chats-=-", lastMessage?.messageContent);
-
-        const urlPattern = /^(ftp|http|https):\/\/[^ "]+$/;
-        const checkISUrl = urlPattern.test(lastMessage?.messageContent);
 
         if (selectedClientId === chats?.clintUserInfo?.id) {
           const findUserOnlineOrOffline = users?.find((item: any) => item?.id === chats?.businessUserInfo?.id);
@@ -106,7 +77,13 @@ const ChatsList = ({ chats, searchText, users, selectedClientId, selectedBusines
                   <Avatar {...stringAvatar(`${chats.businessUserInfo.name} D`)} />
                   <div>
                     <p className="text-xs text-gray-500">{chats.businessUserInfo.name}</p>
-                    <p className="text-xs text-gray-500">{checkISUrl ? "photo" : lastMessage?.messageContent}</p>
+                    <p className="text-xs text-gray-500">
+                      {lastMessage?.messageContent?.type === "image"
+                        ? "photo"
+                        : lastMessage?.messageContent?.type === "video"
+                        ? "video"
+                        : lastMessage?.messageContent?.message}
+                    </p>
                   </div>
                   <p className={`text-xs ml-auto text-gray-500 ${findUserOnlineOrOffline?.is_online ? " text-green-500" : "text-gray-500"}`}>
                     {findUserOnlineOrOffline?.is_online ? "Online" : "Offline"}
@@ -125,7 +102,13 @@ const ChatsList = ({ chats, searchText, users, selectedClientId, selectedBusines
                     <Avatar {...stringAvatar(`${chats.clintUserInfo.name} D`)} />
                     <div>
                       <p className="text-xs text-gray-500">{chats.clintUserInfo.name}</p>
-                      <p className="text-xs text-gray-500">{checkISUrl ? "photo" : lastMessage?.messageContent}</p>
+                      <p className="text-xs text-gray-500">
+                        {lastMessage?.messageContent?.type === "image"
+                          ? "photo"
+                          : lastMessage?.messageContent?.type === "video"
+                          ? "video"
+                          : lastMessage?.messageContent?.message}
+                      </p>
                     </div>
                     <p className={`text-xs ml-auto text-gray-500 ${findUserOnlineOrOffline?.is_online ? " text-green-500" : "text-gray-500"}`}>
                       {findUserOnlineOrOffline?.is_online ? "Online" : "Offline"}
@@ -151,15 +134,7 @@ const MessageItem = ({ message }: MessageItemProps) => {
     <div className="flex items-center justify-between py-3 px-4 bg-white border-b">
       <div className="flex items-center">
         <Avatar {...stringAvatar("Kent Dodds")} />
-        {/* Additional elements like role avatar can be added here */}
-        {/* <p className="text-sm font-medium mr-2">{message.role}</p> */}
-        {/* <p className="text-xs text-gray-500">{message?.content}</p> */}
       </div>
-      {/* <div>
-        <span className="text-xs text-gray-400">
-          {message?.created_at?.toDateString()}
-        </span>
-      </div> */}
     </div>
   );
 };
@@ -175,10 +150,7 @@ const ChatHeader = ({ chatTitle, chatSubtitle }: ChatHeaderProps) => {
     <div className="flex justify-between">
       <div className="flex gap-2">
         <div>
-          {/* <p className="text-base">{chatTitle}</p>
-          <p className="text-base">{chatSubtitle}</p> */}
           <p className="text-lg font-semibold text-[#000]">{chatTitle}</p>
-          {/* <p className="text-xs text-[#808080]">{chatSubtitle}</p> */}
         </div>
       </div>
     </div>
@@ -194,8 +166,6 @@ interface ChatBodyProps {
 
 // ChatBody Component
 const ChatBody = ({ messages, selectedUserType, selectedClientId, selectedBusinessId }: ChatBodyProps) => {
-  console.log("messages/*/*", messages);
-
   const messagesEndRef = useRef<any>(null);
 
   const scrollToBottom = () => {
@@ -212,15 +182,6 @@ const ChatBody = ({ messages, selectedUserType, selectedClientId, selectedBusine
         const milliseconds = message?.time.seconds * 1000 + message?.time.nanoseconds / 1000000;
         const messageTime = new Date(milliseconds);
         const time = moment(messageTime);
-
-        // const momentDate = moment(time);
-        // const finalDate = momentDate.fromNow();
-        // console.log("finalDate/*/*/", finalDate);
-
-        // Regular expression to match URLs
-        const urlPattern = /^(ftp|http|https):\/\/[^ "]+$/;
-        const checkISUrl = urlPattern.test(message?.messageContent);
-
         return (
           <div
             key={index}
@@ -239,10 +200,14 @@ const ChatBody = ({ messages, selectedUserType, selectedClientId, selectedBusine
                   : "bg-[green]"
               }`}
             >
-              {checkISUrl ? (
-                <img src={message?.messageContent} style={{ width: "100px", height: "100px" }} />
-              ) : (
-                <span className="text-xs">{message?.messageContent}</span>
+              {message?.messageContent?.type === "text" && <span className="text-xs">{message?.messageContent?.message}</span>}
+              {message?.messageContent?.type === "image" && (
+                <img src={message?.messageContent?.message} style={{ width: "100px", height: "100px" }} />
+              )}
+              {message?.messageContent?.type === "video" && (
+                <video width="250" controls>
+                  <source src={message?.messageContent?.message} type="video/mp4" />
+                </video>
               )}
 
               <span className="text-[10px] flex justify-end opacity-80">
@@ -276,7 +241,11 @@ const ChatInput = ({ onSendMessage, handleSendUploadMessage, handleUpload, setDo
   const handleSend = () => {
     if (message.trim()) {
       // Prevent sending empty messages
-      onSendMessage(message);
+      const simpleMessage = {
+        type: "text",
+        message: message,
+      };
+      onSendMessage(simpleMessage);
       setMessage("");
     }
   };
@@ -290,44 +259,11 @@ const ChatInput = ({ onSendMessage, handleSendUploadMessage, handleUpload, setDo
     }
   };
 
-  // const [document, setDocument] = useState<any>(null);
-  // const [uploading, setUploading] = useState(false);
-  // const [uploadLink, setUploadLink] = useState("");
-
   // Function to handle document selection
   const handleFileChange = (e: any) => {
     const selectedFile = e.target.files[0];
     setDocument(selectedFile);
   };
-
-  // const handleUpload = async () => {
-  //   if (!document) return;
-
-  //   setUploading(true);
-
-  //   const storageRef = ref(storage, `uploads/${document.name}`);
-  //   const uploadTask = uploadBytesResumable(storageRef, document);
-
-  //   uploadTask.on(
-  //     "state_changed",
-  //     (snapshot) => {
-  //       // Handle progress
-  //     },
-  //     (error) => {
-  //       // Handle errors
-  //       console.error("Error uploading document: ", error);
-  //     },
-  //     () => {
-  //       // Upload completed successfully
-  //       getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-  //         // Pass the download URL to the parent component
-  //         console.log("downloadURL", downloadURL);
-  //         setUploadLink(downloadURL);
-  //         setUploading(false);
-  //       });
-  //     }
-  //   );
-  // };
 
   const [open, setOpen] = useState(false);
   const handleOpen = () => setOpen(true);
@@ -344,9 +280,7 @@ const ChatInput = ({ onSendMessage, handleSendUploadMessage, handleUpload, setDo
           className="w-full pl-10 pr-16 h-14 bg-[#F7F7F8] outline-none text-xs text-gray-400 rounded-[10px]"
           placeholder="Type a message..."
         />
-        <span onClick={handleSend} className="text-[#605BFF] absolute right-4">
-          {/* <RiSendPlaneFill /> */}
-        </span>
+        <span onClick={handleSend} className="text-[#605BFF] absolute right-4"></span>
       </div>
       <div className="w-[30%]">
         <button className="bg-black py-1 px-3 rounded-md" onClick={handleOpen}>
@@ -428,19 +362,10 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
 
   const onChangeBusiness = async (business_Id: any) => {
     setSelectedBusinessId(business_Id);
-    setValue("businessList", business_Id);
 
     const FindBusiness = filterOnlyBusinessList?.find((item: any) => item?.id === business_Id);
     const FindClient = filterOnlyUserList?.find((item: any) => item?.id === selectedClientId);
 
-    console.log("FindBusiness", FindBusiness, FindClient);
-
-    // const payload = {
-    //   type: selectedUserType,
-    //   clintId: selectedClientId,
-    //   businessId: business_Id,
-    //   created_at: new Date(),
-    // };
     const payload = {
       type: selectedUserType,
       clintUserInfo: { id: selectedClientId, name: FindClient?.name, phone: FindClient?.phone },
@@ -448,7 +373,6 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
       created_at: new Date(),
     };
     const ID = uuidv4();
-    console.log("payload ID:", payload, ID);
 
     if (selectedUserType === "user") {
       if (allChats?.some((item: any) => item.businessUserInfo.id === business_Id && item.clintUserInfo.id === selectedClientId)) {
@@ -525,8 +449,6 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
         </div>
       )}
       <SearchBar setSearchText={setSearchText} />
-      {/* <MessageList messages={messages} onChatSelect={onChatSelect} /> */}
-      {/* {selectedUserType === "user" && ( */}
       <ChatsList
         chats={allChats}
         searchText={searchText}
@@ -535,7 +457,6 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
         selectedBusinessId={selectedBusinessId}
         onChatSelect={onChatSelect}
       />
-      {/* )} */}
     </div>
   );
 };
@@ -599,9 +520,7 @@ interface GroupedMessages {
 const Chat = () => {
   // State variables
   const [userModal, setuserModal] = useState<boolean>(false);
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Chat[]>([]);
-  console.log("messages////", messages);
 
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedBusinessId, setSelectedBusinessId] = useState("");
@@ -615,7 +534,6 @@ const Chat = () => {
 
   // Handler for selecting a chat
   const handleChatSelect = async (chats: any) => {
-    console.log("chats*/*/", chats);
     setChatDetails(chats);
   };
 
@@ -632,24 +550,7 @@ const Chat = () => {
     return () => messagesLive();
   }, [chatDetails?.id]);
 
-  // const filteredMessages = useMemo(() => {
-  //   return messages?.filter((message) => message.chatId === selectedChatId);
-  // }, [messages, selectedChatId]);
-
-  // Assuming messages are already sorted by timestamp
-  // const lastMessages: Chat[] = useMemo(() => {
-  //   const groupedMessages = messages?.reduce((acc: GroupedMessages, message) => {
-  //     acc[message.chatId] = message;
-  //     return acc;
-  //   }, {});
-
-  //   return Object.values(groupedMessages);
-  // }, [messages]);
-
-  // Handler for sending a message
   const handleSendMessage = async (messageContent: any) => {
-    console.log("chatDetails", chatDetails);
-
     const messageData: any = {
       senderID: selectedUserType === "user" ? chatDetails?.clintUserInfo?.id : chatDetails?.businessUserInfo?.id,
       senderName: selectedUserType === "user" ? chatDetails?.clintUserInfo?.name : chatDetails?.businessUserInfo?.name,
@@ -668,8 +569,6 @@ const Chat = () => {
           const MeargeData = data?.messages ? [...data?.messages, messageData] : [messageData];
 
           await setDoc(docRef, { ["messages"]: MeargeData }, { merge: true });
-          // setMessages(MeargeData);
-          console.log("Document successfully updated!");
         } else {
           console.log("Document does not exist.");
         }
@@ -705,7 +604,6 @@ const Chat = () => {
           // Upload completed successfully
           getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
             // Pass the download URL to the parent component
-            console.log("downloadURL", downloadURL);
             setUploadLink(downloadURL);
             setUploading(false);
           });
@@ -715,7 +613,22 @@ const Chat = () => {
   };
 
   const handleSendUploadMessage = () => {
-    handleSendMessage(uploadLink);
+    const splitType = document?.type;
+    const fileType = splitType.split("/")[0];
+
+    if (fileType === "image") {
+      const messageContent = {
+        type: "image",
+        message: uploadLink,
+      };
+      handleSendMessage(messageContent);
+    } else if (fileType === "video") {
+      const messageContent = {
+        type: "video",
+        message: uploadLink,
+      };
+      handleSendMessage(messageContent);
+    }
   };
 
   const [users, setUsers] = useState<User[]>([]);
@@ -737,18 +650,6 @@ const Chat = () => {
   }, []); // Empty dependency array means it will only run once on component mount
 
   useEffect(() => {
-    // async function fetchUsers() {
-    //   const usersRef = collection(db, "users");
-    //   const q = query(usersRef);
-    //   const querySnapshot = await getDocs(q);
-    //   const usersList: User[] = querySnapshot.docs.map((doc) => ({
-    //     ...doc.data(),
-    //     id: doc.id,
-    //   }));
-    //   setUsers(usersList);
-    // }
-    // fetchUsers();
-
     const fetchUsers = () => {
       const usersRef = collection(db, "users");
       const unsubscribe = onSnapshot(usersRef, (querySnapshot) => {
@@ -782,7 +683,6 @@ const Chat = () => {
           console.log("No such document!");
         }
       });
-
       return () => userLive();
     }
   };
@@ -812,11 +712,9 @@ const Chat = () => {
   return (
     <div className="p-8 w-full flex gap-6">
       <LeftPanel
-        // messages={lastMessages}
         onChatSelect={handleChatSelect}
         handleOpenModal={handleOpenUserModal}
         users={users}
-        // fatchChats={fatchChats}
         allChats={allChats}
         selectedUserType={selectedUserType}
         setSelectedClientId={setSelectedClientId}
@@ -825,7 +723,6 @@ const Chat = () => {
         selectedBusinessId={selectedBusinessId}
         setSelectedBusinessId={setSelectedBusinessId}
       />
-      {/* <RightPanel chatDetails={chatDetails} messages={filteredMessages} onSendMessage={handleSendMessage} /> */}
       <RightPanel
         chatDetails={chatDetails}
         messages={messages}
